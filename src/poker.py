@@ -148,10 +148,13 @@ def hand_strength(
     8: straight flush
 
     In order to deal with ties, the second number will represent the strength of the 'strongest' card in the hand. 
-    To give an example, if we imagine we have an Ace-high flush, we will report our hand as (5, 14), indicating flush, 
+    To give an example, if we imagine we have an Ace-high flush, we will report our hand as (5, 13), indicating flush, 
     ace high. The second number will represent the strength of the second strongest card. In the case of the 1 paired hands, this
     is the same as the strength of the strongest card. We do this all the way down through the strength of the hand. 
     The reason to do this is to determine who wins in the case of tie breaks.
+
+    In the case of straights, they can be ace low or ace high. Ace high straights would be denoted (4, 13, 12, 11, 10, 9)
+    and ace low straights would be denoted (4, 3, 2, 1, 0, 13).
     
     This function will largely be written as a series of if statements, I suppose. I'm not sure how else to think through the 
     complexity of the hand. 
@@ -162,103 +165,98 @@ def hand_strength(
         rank_counter[card.rank] += 1
         suit_counter[card.suit] += 1
 
-    ## check for straight flush (or just flush)
-    
-    for key in suit_counter.keys():
-        if suit_counter[key] >= 5:
-            suit_of_interest = key
-            cards_of_suit = []
-            for card in hand:
-                if card.suit == suit_of_interest:
-                    cards_of_suit.append(card)
-        
-            ranks = [card.rank for card in cards_of_suit]
-            sorted(ranks)
-            ranks = set(ranks)
-            for i in range(13, 3, -1):
-                straight_order = np.arange(i-4, i+1)
-                if len(ranks.intersection(straight_order)) == 5:
-                    return (8, straight_order[-1], straight_order[-2], straight_order[-3], straight_order[-4], straight_order[-5])
-            ace_low_sf = [13, 0, 1, 2, 3]
-            if len(ranks.intersection(ace_low_sf)) == 5:
-                return(8, 3, 2, 1, 0, 13)
+    ## check for straight flush
+    flush, flush_ranks = _is_flush(hand)
+    flush_ranks = sorted(flush_ranks)
+    if flush:
+        straight, straight_ranks = _is_straight(flush_ranks)
+        if straight:
+            return (8, straight_ranks[0], straight_ranks[1], straight_ranks[2], straight_ranks[3], straight_ranks[4])
                 
     ## check for 4 of a kind
-    for key in rank_counter.keys():
-        if rank_counter[key] == 4:
-            rank_of_interest = key
-            ranks = []
-            for key in rank_counter.keys():
-                if key != rank_of_interest:
-                    ranks.append(key)
-            sorted(ranks)
-            return (7, rank_of_interest, rank_of_interest, rank_of_interest, rank_of_interest, ranks[-1])
-            
+    quad_rank = [r for r in rank_counter.keys() if rank_counter[r] == 4]
+    if len(quad_rank) != 0:
+        kicker = sorted([r for r in rank_counter.keys() if rank_counter[r] != 4])
+        return (7, quad_rank[0], quad_rank[0], quad_rank[0], quad_rank[0], kicker[-1])
+
     ## check for full houses
-    ranks = reversed(sorted(list(rank_counter.keys()))) ## sort by ranks from highest to lowest
-    for key in ranks:
-        if rank_counter[key] == 3:
-            for other_key in ranks:
-                if other_key != key and rank_counter[other_key] >= 2:
-                    return (6, key, key, key, other_key, other_key)
+    trips_rank = [r for r in rank_counter.keys() if rank_counter[r] == 3] 
+    doubles_rank = [r for r in rank_counter.keys() if rank_counter[r] >= 2]
 
-    ## check for flush
-    for key in suit_counter.keys():
-        if suit_counter[key] >= 5:
-            suit_of_interest = key
-            ranks = []
-            for card in hand:
-                if card.suit == suit_of_interest:
-                    ranks.append(card.rank)
-            sorted(ranks)
-            ranks = ranks[-5:] ## take highest five card flush. no need to check for straight flush as we have done this already.
-            return (5, ranks[-1], ranks[-2], ranks[-3], ranks[-4], ranks[-5]) 
+    if len(trips_rank) != 0 and len(doubles_rank) != 0:
+        trip_rank = max(trips_rank)
+        doubles_rank_trip_removed = [k for k in doubles_rank if k != trip_rank]
+        if len(doubles_rank_trip_removed) > 0:
+            double_rank = max(doubles_rank_trip_removed)
+            return (6, trip_rank, trip_rank, trip_rank, double_rank, double_rank)
+    
+    ## check for flush but not straight
+    if flush and not straight:
+        return (5, flush_ranks[-1], flush_ranks[-2], flush_ranks[-3], flush_ranks[-4], flush_ranks[-5])
 
-    ## check for straight
-    ranks = set(sorted(list(rank_counter.keys())))
-    if len(ranks) >= 5:
-        for i in range(13, 3, -1):
-            straight = np.arange(i-4, i+1)
-            if len(ranks.intersection(straight)) == 5:
-                return (4, straight[-1], straight[-2], straight[-3], straight[-4], straight[-5])
-        ace_low_straight = set([13, 0, 1, 2, 3])
-        if len(ranks.intersection(ace_low_straight)) == 5:
-            return (4, 3, 2, 1, 0, 13)
+    ## check for straight but not flush
+    ranks = list(set(list(rank_counter.keys())))
+    sorted_ranks = sorted(ranks)
+    straight, straight_ranks = _is_straight(sorted_ranks)
+    if straight:
+        return (4, straight_ranks[0], straight_ranks[1], straight_ranks[2], straight_ranks[3], straight_ranks[4])
             
     ## check for 3 of a kind
-    reversed(sorted(list(rank_counter.keys())))
-    for rank in ranks:
-        if rank_counter[rank] == 3:
-            for other_rank in ranks:
-                if other_rank != rank:
-                    kicker_1 = other_rank
-            for other_rank in ranks:
-                if other_rank != rank and other_rank != kicker_2:
-                    kicker_2 = other_rank
-            return (3, rank, rank, rank, kicker_1, kicker_2)
+    if len(trips_rank)==1:
+        kickers = sorted([k for k in rank_counter.keys() if rank_counter[k] == 1])
+        trip_rank = trips_rank[0]
+        return (3, trip_rank, trip_rank, trip_rank, kickers[-1], kickers[-2])
 
     ## check for 2 pair
-    for rank in ranks:
-        if rank_counter[rank] == 2:
-            for other_rank in ranks:
-                if other_rank != rank and rank_counter[other_rank] == 2:
-                    for kicker in ranks:
-                        if kicker != rank and kicker != other_rank:
-                            return (2, rank, rank, other_rank, other_rank, kicker)
+    if len(doubles_rank) >= 2:
+        doubles_rank = sorted(doubles_rank)
+        pair_1 = doubles_rank[-1]
+        pair_2 = doubles_rank[-2]
+        kicker = max([k for k in rank_counter.keys() if k != pair_1 and k != pair_2])
+        return (2, pair_1, pair_1, pair_2, pair_2, kicker)
 
     ## check for 1 pair
-    for rank in ranks:
-        if rank_counter[rank] == 2:
-            for other_rank in ranks:
-                if other_rank != rank:
-                    kicker_1 = other_rank
-            for other_rank in ranks:
-                if other_rank != rank and other_rank != kicker_1:
-                    kicker_2 = other_rank
-            for other_rank in ranks:
-                if other_rank != rank and other_rank != kicker_1 and other_rank != kicker_2:
-                    kicker_3 = other_rank
-            return (1, rank, rank, kicker_1, kicker_2, kicker_3)
+    if len(doubles_rank) == 1:
+        pair = doubles_rank[0]
+        kickers = sorted([k for k in rank_counter.keys() if k != pair])
+        return (1, pair, pair, kickers[-1], kickers[-2], kickers[-3])
 
     ## Return high card hand
-    return (0, ranks[0], ranks[1], ranks[2], ranks[3], ranks[4])
+    ranks = sorted(list(rank_counter.keys()))
+    return (0, ranks[-1], ranks[-2], ranks[-3], ranks[-4], ranks[-5])
+
+def _is_flush(hand):
+    """
+    Checks if the hand is a flush. This is written
+    to reduce some of the code duplication in the hand
+    strength computation. 
+
+    Returns whether it is a flush or not, and the cards
+    belong to the suit creating the flush.
+    """
+    suit_counter = defaultdict(int)
+    for card in hand:
+        suit_counter[card.suit] += 1
+    for key in suit_counter.keys():
+        if suit_counter[key] >= 5:
+            ranks = [card.rank for card in hand if card.suit == key]
+            return True, ranks
+    return False, []
+
+def _is_straight(sorted_ranks):
+    """
+    Checks if the hand is a straight, given the ranks in sorted order.
+
+    Returns the highest possible straight, given the ranks, if possible.
+    """
+    sorted_ranks = list(reversed(sorted_ranks))
+    for i in range(len(sorted_ranks)-4):
+        if sorted_ranks[i] - sorted_ranks[i+4] == 4:
+            return True, (sorted_ranks[i:i+5])
+
+    if sorted_ranks[0] == 13:
+        if sorted_ranks[-4:] == [3, 2, 1, 0]:
+            return True, [3, 2, 1, 0, 13]
+    return False, []
+        
+    
