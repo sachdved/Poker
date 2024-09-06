@@ -1,3 +1,7 @@
 
 /.ipynb_checkpoints
 /src/.ipynb_checkpoints
+/tests/.ipynb_checkpoints
+/src/poker/__pycache__
+/src/poker/.ipynb_checkpoints
+/src/poker.egg-info

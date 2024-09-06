@@ -3,6 +3,8 @@ import scipy as sp
 
 import random
 
+from collections import defaultdict
+
 
 class Card():
     """
@@ -258,5 +260,3 @@ def _is_straight(sorted_ranks):
         if sorted_ranks[-4:] == [3, 2, 1, 0]:
             return True, [3, 2, 1, 0, 13]
     return False, []
-        
-    
