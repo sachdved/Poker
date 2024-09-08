@@ -321,4 +321,39 @@ def simulate_outcomes(
     
     std_strengths = number_of_combos/(number_of_combos - 1) * (second_moment_strengths - average_strength ** 2)
     return (average_strength, std_strengths, best_hand_thus_far)
-            
+
+def simulate_opposing_outcomes(
+    my_hand, community_cards
+) -> typing.Tuple[np.array, np.array, np.array]:
+    """
+    This method exists as a means of calculating the strongest hands my opponent can obtain given 
+    the existing community cards and the removal that I have.
+    """
+    num_suits = 4
+    num_ranks = 13
+
+    average_strength = np.zeros(6)
+    second_moment_strengths = np.zeros(6)
+    best_hand_thus_far = np.zeros(6)
+
+    deck = Deck(num_suits, num_ranks)
+    deck.deck = [item for item in deck.deck if item not in my_hand + community_cards.cards]
+
+    num_cards_to_deal = 7 - len(community_cards.cards)
+    number_of_combos = sp.special.comb(len(deck.deck), num_cards_to_deal)
+
+    for combo in itertools.combinations(deck.deck, num_cards_to_deal):
+        combo_list = [card for card in combo]
+        opponent_potential = community_cards.cards + combo_list
+        hand_result = hand_strength(opponent_potential)
+        hand_result = np.asarray([num for num in hand_result])
+
+        average_strength += hand_result / number_of_combos
+        second_moment_strengths += hand_result ** 2 / number_of_combos
+
+        for k in range(len(best_hand_thus_far)):
+            if (hand_result[:k] == best_hand_thus_far[:k]).all() and hand_result[k] > best_hand_thus_far[k]:
+                best_hand_thus_far = hand_result
+    
+    std_strengths = number_of_combos/(number_of_combos - 1) * (second_moment_strengths - average_strength ** 2)
+    return (average_strength, std_strengths, best_hand_thus_far)
