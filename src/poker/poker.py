@@ -8,6 +8,7 @@ from collections import defaultdict
 import typing
 
 from tqdm import tqdm
+import itertools
 
 class Card():
     """
@@ -285,11 +286,11 @@ def _is_straight(sorted_ranks):
     return False, []
 
 def simulate_outcomes(
-    hand, replicates = 1000000
+    hand
 ) -> typing.Tuple[np.array, np.array, np.array]:
     """
     This method exists as a means of calculating the various possible hands that can be created
-    given a set of cards. Rather than analytically calculate, this is done via a simulation.
+    given a set of cards. Rather than analytically calculate, this is done by sampling all possible.
     The function reports the average strength, the standard error of the strength, and the strongest
     thus far.
     """
@@ -300,20 +301,24 @@ def simulate_outcomes(
     second_moment_strengths = np.zeros(6)
     best_hand_thus_far = np.zeros(6)
 
-    for i in tqdm(range(replicates)):
-        deck = Deck(num_suits, num_ranks)
-        deck.deck = [item for item in deck.deck if item not in hand]
-        dealt_cards = deck.deal_cards( 7 - len(hand))
-        cards = hand + dealt_cards
-        hand_result = hand_strength(cards)
+    deck = Deck(num_suits, num_ranks)
+    deck.deck = [item for item in deck.deck if item not in hand]
+    num_cards_left = 7 - len(hand)
+    number_of_combos = sp.special.comb(len(deck.deck), num_cards_left)
+
+    for potential in itertools.combinations(deck.deck, num_cards_left):
+        list_potential = [card for card in potential]
+        potential_hand = hand + list_potential
+        hand_result = hand_strength(potential_hand)
         hand_result = np.asarray([num for num in hand_result])
 
-        average_strength += hand_result / replicates
-        second_moment_strengths += hand_result ** 2 / replicates
+        average_strength += hand_result / number_of_combos
+        second_moment_strengths += hand_result ** 2 / number_of_combos
 
         for k in range(len(best_hand_thus_far)):
             if (hand_result[:k] == best_hand_thus_far[:k]).all() and hand_result[k] > best_hand_thus_far[k]:
                 best_hand_thus_far = hand_result
-    std_strengths = replicates/(replicates - 1) * (second_moment_strengths - average_strength ** 2)
+    
+    std_strengths = number_of_combos/(number_of_combos - 1) * (second_moment_strengths - average_strength ** 2)
     return (average_strength, std_strengths, best_hand_thus_far)
             
