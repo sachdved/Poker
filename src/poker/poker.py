@@ -5,6 +5,9 @@ import random
 
 from collections import defaultdict
 
+import typing
+
+from tqdm import tqdm
 
 class Card():
     """
@@ -20,6 +23,14 @@ class Card():
         """
         self.suit = suit
         self.rank = rank
+    def __eq__(
+        self, 
+        other
+    ):
+        if isinstance(other, Card):
+            return other.rank == self.rank and other.suit == self.suit
+        else:
+            return False
 
 
 class CommunityCards():
@@ -98,6 +109,18 @@ class Deck():
         Deal river card to the community.
         """
         community_cards.cards.append(self.deck.pop(0))
+
+    def deal_cards(
+        self,
+        num_cards
+    ) -> typing.List:
+        """
+        Deals out a specified number of cards. Does not effect deck state, as this
+        does not pertain to the dealing of a particular hand. Used for simulations
+        only.
+        """
+        dealt_cards = self.deck[:num_cards]
+        return dealt_cards
 
 
 class Player():
@@ -256,7 +279,41 @@ def _is_straight(sorted_ranks):
         if sorted_ranks[i] - sorted_ranks[i+4] == 4:
             return True, (sorted_ranks[i:i+5])
 
-    if sorted_ranks[0] == 13:
+    if sorted_ranks[0] == 12:
         if sorted_ranks[-4:] == [3, 2, 1, 0]:
-            return True, [3, 2, 1, 0, 13]
+            return True, [3, 2, 1, 0, 12]
     return False, []
+
+def simulate_outcomes(
+    hand, replicates = 1000000
+) -> typing.Tuple[np.array, np.array, np.array]:
+    """
+    This method exists as a means of calculating the various possible hands that can be created
+    given a set of cards. Rather than analytically calculate, this is done via a simulation.
+    The function reports the average strength, the standard error of the strength, and the strongest
+    thus far.
+    """
+    num_suits = 4
+    num_ranks = 13
+
+    average_strength = np.zeros(6)
+    second_moment_strengths = np.zeros(6)
+    best_hand_thus_far = np.zeros(6)
+
+    for i in tqdm(range(replicates)):
+        deck = Deck(num_suits, num_ranks)
+        deck.deck = [item for item in deck.deck if item not in hand]
+        dealt_cards = deck.deal_cards( 7 - len(hand))
+        cards = hand + dealt_cards
+        hand_result = hand_strength(cards)
+        hand_result = np.asarray([num for num in hand_result])
+
+        average_strength += hand_result / replicates
+        second_moment_strengths += hand_result ** 2 / replicates
+
+        for k in range(len(best_hand_thus_far)):
+            if (hand_result[:k] == best_hand_thus_far[:k]).all() and hand_result[k] > best_hand_thus_far[k]:
+                best_hand_thus_far = hand_result
+    std_strengths = replicates/(replicates - 1) * (second_moment_strengths - average_strength ** 2)
+    return (average_strength, std_strengths, best_hand_thus_far)
+            
