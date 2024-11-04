@@ -287,12 +287,12 @@ def _is_straight(sorted_ranks):
 
 def simulate_outcomes(
     hand
-) -> typing.Tuple[np.array, np.array, np.array]:
+) -> np.array:
     """
     This method exists as a means of calculating the various possible hands that can be created
     given a set of cards. Rather than analytically calculate, this is done by sampling all possible.
-    The function reports the average strength, the standard error of the strength, and the strongest
-    thus far.
+    The function explicitly reports the number of combos that can lead to each strength, and the average
+    strength of each card in the hand.
     """
     num_suits = 4
     num_ranks = 13
@@ -322,7 +322,7 @@ def simulate_outcomes(
 
 def simulate_opposing_outcomes(
     my_hand, community_cards
-) -> typing.Tuple[np.array, np.array, np.array]:
+) -> np.array:
     """
     This method exists as a means of calculating the strongest hands my opponent can obtain given 
     the existing community cards and the removal that I have.
@@ -344,6 +344,9 @@ def simulate_opposing_outcomes(
         opponent_potential = community_cards.cards + combo_list
         hand_result = hand_strength(opponent_potential)
         hand_result = np.asarray([num for num in hand_result])
+
+        hand_outcomes[hand_result[0], 0] += 1 
+        hand_outcomes[hand_result[0], 1:] += hand_result[1:] 
 
     for i in range(9):
         if hand_outcomes[i, 0]  != 0:

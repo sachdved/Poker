@@ -7,3 +7,4 @@
 /src/poker.egg-info
 /dev/.ipynb_checkpoints
 /dev
+/tests/__pycache__
